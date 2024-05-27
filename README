@@ -1,0 +1,16 @@
+/****** meow ******/
+
+a collection of `cat`s i wrote.
+
+asm and c versions written by going through tutorials, so code may be similar
+to others out there
+rust and go done thanks to the rust book and included lang documentation.
+
+go version is still a work in progress. just need to do arg handling.
+
+rust version is the one i put the most effort into, you can see where my
+interests lie :>
+
+// BUILDING
+just run `make`. all binaries are named differently.
+asm will compile as `cat`, since that was the first one i did.

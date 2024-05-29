@@ -1,6 +1,7 @@
 use std::env::args;
 use std::fs::File;
-use std::io::{ErrorKind, Read};
+use std::io::{stdin, ErrorKind, Read};
+//use std::io::{stdout, Write};
 use std::process::exit;
 
 // define all the escape codes, _ for no unused warn
@@ -34,56 +35,69 @@ fn main() {
     let _ec_err = rgb_it(true, 0xAD, 0xAB, 0x0D);
     let args: Vec<String> = args().skip(1).collect();
     let mut fails: Vec<(&str, String, String)> = vec![];
+    let mut buffer = String::new();
+    let stdin = stdin();
+    // let mut buffer = Vec::new();
+    // let mut stdout = stdout();
+    // let mut handle = stdin.lock();
 
     if args.is_empty() {
-        eprintln!("Need at least one arg!");
-        exit(1);
+        // this doesn't exactly do what `cat` normally does.
+        // we need to read and repeat each line until user gives EOF
+        // so far we just take everything and put it in the buffer before
+        // printing it out at the end, if it's valid
+
+        // handle.read_to_end(&mut buffer).unwrap();
+        // stdout.write_all(&buffer);
+        loop {
+            match stdin.read_line(&mut buffer) {
+                Ok(0) => {
+                    exit(0);
+                }
+                Ok(_) => Some(Ok(&buffer)),
+                Err(error) => Some(Err(error)),
+            };
+            print!("{buffer}");
+            buffer.clear();
+        }
     }
 
     for i in args.into_iter() {
         let file_result = File::open(&i);
         let mut cont = String::new();
 
-        let mut file = match file_result {
-            Ok(file) => file,
+        let file = match file_result {
+            Ok(mut file) => match file.read_to_string(&mut cont) {
+                Ok(_) => cont,
+                Err(error) => match error.kind() {
+                    ErrorKind::InvalidData => {
+                        fails.push(("read", i, "invalid UTF-8 or binary".to_string()));
+                        continue;
+                    }
+                    _ => {
+                        fails.push(("read", i, error.to_string()));
+                        //continue;
+                        panic!("{:?}", error);
+                    }
+                },
+            },
             Err(error) => match error.kind() {
                 ErrorKind::NotFound => {
-                    let tfail = ("open", i, "file not found".to_string());
-                    fails.push(tfail);
+                    fails.push(("open", i, "file not found".to_string()));
                     continue;
                 }
                 ErrorKind::PermissionDenied => {
-                    let tfail = ("open", i, "permission denied".to_string());
-                    fails.push(tfail);
+                    fails.push(("open", i, "permission denied".to_string()));
                     continue;
                 }
                 _ => {
-                    let tfail = ("open", i, error.to_string());
-                    fails.push(tfail);
+                    fails.push(("open", i, error.to_string()));
                     //continue;
                     panic!("{:?}", error);
                 }
             },
         };
-
-        let result = match file.read_to_string(&mut cont) {
-            Ok(_) => cont,
-            Err(error) => match error.kind() {
-                ErrorKind::InvalidData => {
-                    let tfail = ("read", i, "invalid UTF-8 or binary".to_string());
-                    fails.push(tfail);
-                    continue;
-                }
-                _ => {
-                    let tfail = ("read", i, error.to_string());
-                    fails.push(tfail);
-                    //continue;
-                    panic!("{:?}", error);
-                }
-            },
-        };
-        //file.read_to_string(&mut cont).unwrap();
-        print!("{result}");
+        print!("{file}");
     }
 
     if !fails.is_empty() {
